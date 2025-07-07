@@ -39,14 +39,11 @@ export function RouterConnection({ routerData, onConnect, routerNumber }: Router
       const api = createMikroTikApi(credentials);
       const result = await api.connect();
 
-      // Se la connessione fallisce, prova con dati mock per demo
-      const finalResult = result.success ? result : createMockData();
-
-      if (finalResult.success && finalResult.data) {
+      if (result.success && result.data) {
         onConnect({
           credentials,
-          addressLists: finalResult.data.addressLists,
-          firewallRules: finalResult.data.firewallRules,
+          addressLists: result.data.addressLists,
+          firewallRules: result.data.firewallRules,
           isConnected: true,
           loading: false,
           error: undefined
@@ -57,22 +54,18 @@ export function RouterConnection({ routerData, onConnect, routerNumber }: Router
           credentials,
           isConnected: false,
           loading: false,
-          error: finalResult.error || 'Errore di connessione'
+          error: result.error || 'Errore di connessione'
         });
       }
     } catch (error) {
-      // In caso di errore completo, usa dati mock per demo
-      const mockResult = createMockData();
-      if (mockResult.data) {
-        onConnect({
-          credentials,
-          addressLists: mockResult.data.addressLists,
-          firewallRules: mockResult.data.firewallRules,
-          isConnected: true,
-          loading: false,
-          error: 'Connesso con dati demo (router non raggiungibile)'
-        });
-      }
+      const errorMessage = error instanceof Error ? error.message : 'Errore sconosciuto';
+      onConnect({
+        ...routerData,
+        credentials,
+        isConnected: false,
+        loading: false,
+        error: `Errore di connessione: ${errorMessage}`
+      });
     } finally {
       setIsConnecting(false);
     }
