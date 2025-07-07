@@ -11,7 +11,7 @@ export class MikroTikApiService {
 
   constructor(credentials: RouterCredentials) {
     this.credentials = credentials;
-    this.baseUrl = `http://${credentials.host}`;
+    this.baseUrl = `http://${credentials.host}:8728`;
   }
 
   /**
