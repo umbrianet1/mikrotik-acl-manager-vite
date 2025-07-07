@@ -2,121 +2,49 @@ import { RouterCredentials, AddressListItem, FirewallRule, ConnectionResult } fr
 
 /**
  * MikroTik API Service
- * Note: Questo servizio funziona solo se il router MikroTik ha CORS abilitato
- * o se viene utilizzato un proxy/backend intermedio
+ * Utilizza il backend Flask per connettersi ai router MikroTik
  */
 export class MikroTikApiService {
-  private baseUrl: string;
+  private backendUrl: string;
   private credentials: RouterCredentials;
 
   constructor(credentials: RouterCredentials) {
     this.credentials = credentials;
-    this.baseUrl = `http://${credentials.host}:8728`;
+    this.backendUrl = 'http://localhost:5000/api';
   }
 
   /**
-   * Effettua il login al router MikroTik
-   * Nota: Per motivi di sicurezza, in produzione dovresti usare HTTPS
-   */
-  private async login(): Promise<Response> {
-    const loginUrl = `${this.baseUrl}/login`;
-    
-    // Prima richiesta per ottenere il cookie di sessione
-    const response = await fetch(loginUrl, {
-      method: 'GET',
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      throw new Error('Impossibile connettersi al router');
-    }
-
-    // Seconda richiesta con le credenziali
-    const formData = new FormData();
-    formData.append('username', this.credentials.username);
-    formData.append('password', this.credentials.password);
-
-    const loginResponse = await fetch(loginUrl, {
-      method: 'POST',
-      body: formData,
-      credentials: 'include',
-    });
-
-    if (!loginResponse.ok) {
-      throw new Error('Credenziali non valide');
-    }
-
-    return loginResponse;
-  }
-
-  /**
-   * Recupera le address list dal router
-   */
-  async getAddressLists(): Promise<AddressListItem[]> {
-    try {
-      await this.login();
-      
-      const response = await fetch(`${this.baseUrl}/rest/ip/firewall/address-list`, {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Errore nel recupero delle address list');
-      }
-
-      const data = await response.json();
-      return Array.isArray(data) ? data : [];
-    } catch (error) {
-      console.error('Errore getAddressLists:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Recupera le regole firewall dal router
-   */
-  async getFirewallRules(): Promise<FirewallRule[]> {
-    try {
-      await this.login();
-      
-      const response = await fetch(`${this.baseUrl}/rest/ip/firewall/filter`, {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Errore nel recupero delle regole firewall');
-      }
-
-      const data = await response.json();
-      return Array.isArray(data) ? data : [];
-    } catch (error) {
-      console.error('Errore getFirewallRules:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Connette al router e recupera tutti i dati
+   * Connette al router tramite il backend e recupera tutti i dati
    */
   async connect(): Promise<ConnectionResult> {
     try {
-      const [addressLists, firewallRules] = await Promise.all([
-        this.getAddressLists(),
-        this.getFirewallRules()
-      ]);
+      const response = await fetch(`${this.backendUrl}/connect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          host: this.credentials.host,
+          username: this.credentials.username,
+          password: this.credentials.password,
+        }),
+      });
 
-      return {
-        success: true,
-        data: {
-          addressLists,
-          firewallRules
-        }
-      };
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.error || 'Errore di connessione al backend'
+        };
+      }
+
+      return data;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Errore sconosciuto';
       return {
         success: false,
-        error: errorMessage
+        error: `Errore di connessione al backend: ${errorMessage}`
       };
     }
   }
